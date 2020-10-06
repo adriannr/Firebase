@@ -15,6 +15,12 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
+            <Button
+                android:id="@+id/save_ocr_btn"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Save"
+                />
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -44,6 +50,7 @@
                         android:layout_height="wrap_content"></EditText>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
+            <!-- skip translation
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -73,6 +80,7 @@
                         android:layout_height="wrap_content"></EditText>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
+            -->
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -95,10 +103,18 @@
                         android:id="@+id/imageIv"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:maxHeight="250dp"></ImageView>
+                        android:maxHeight="100dp"></ImageView>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
-
+            <ListView
+                android:id="@+id/messageListView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_above="@+id/linearLayout"
+                android:stackFromBottom="true"
+                android:divider="@android:color/transparent"
+                android:transcriptMode="alwaysScroll"
+                tools:listitem="@layout/item_menu"/>
         </LinearLayout>
     </ScrollView>
 
