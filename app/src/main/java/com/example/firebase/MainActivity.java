@@ -1,5 +1,6 @@
 package com.example.firebase;
 
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
@@ -19,41 +20,42 @@ import android.graphics.drawable.BitmapDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
-import android.util.Log;
-import android.util.SparseArray;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.ListView;
 import android.widget.Toast;
 
 import com.firebase.ui.auth.AuthUI;
+import com.google.android.gms.tasks.Continuation;
+import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
-import com.google.android.gms.vision.Frame;
-import com.google.android.gms.vision.text.TextBlock;
-import com.google.android.gms.vision.text.TextRecognizer;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.ml.common.modeldownload.FirebaseModelDownloadConditions;
+import com.google.firebase.database.ChildEventListener;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 
 import com.google.firebase.ml.vision.FirebaseVision;
 import com.google.firebase.ml.vision.common.FirebaseVisionImage;
 import com.google.firebase.ml.vision.document.FirebaseVisionDocumentText;
 import com.google.firebase.ml.vision.document.FirebaseVisionDocumentTextRecognizer;
-import com.google.firebase.ml.vision.text.FirebaseVisionText;
-import com.google.firebase.ml.vision.text.FirebaseVisionTextRecognizer;
 import com.google.firebase.ml.vision.text.RecognizedLanguage;
 
-import com.google.mlkit.common.model.DownloadConditions;
-import com.google.mlkit.nl.translate.TranslateLanguage;
-import com.google.mlkit.nl.translate.Translation;
-import com.google.mlkit.nl.translate.Translator;
-import com.google.mlkit.nl.translate.TranslatorOptions;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
 import com.theartofdev.edmodo.cropper.CropImage;
 import com.theartofdev.edmodo.cropper.CropImageView;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -62,6 +64,12 @@ public class MainActivity extends AppCompatActivity {
     EditText mResultEt;
     //EditText mResultEtTranslate;
     ImageView mPreviewIv;
+    Button mSaveOcrBtn;
+    private MenuAdapter mMenuAdapter;
+    private ListView mMenuListView;
+    private ChildEventListener mChildEventListener;
+
+
 
     private static final String TAG = "MainActivity";
 
@@ -84,6 +92,10 @@ public class MainActivity extends AppCompatActivity {
 
     private FirebaseAuth mFirebaseAuth;
     private FirebaseAuth.AuthStateListener mAuthStateListener;
+    private FirebaseDatabase mFirebaseDatabase;
+    private DatabaseReference mMenuesDatabaseReference;
+    private FirebaseStorage mFirebaseStorage;
+    private StorageReference mMenuPhotosStorageReference;
 
 
     @Override
@@ -95,11 +107,19 @@ public class MainActivity extends AppCompatActivity {
         mResultEt = findViewById(R.id.resultEt);
         //mResultEtTranslate = findViewById(R.id.resultEtTranslate);
         mPreviewIv = findViewById(R.id.imageIv);
+        mSaveOcrBtn = findViewById(R.id.save_ocr_btn);
+        mMenuListView = (ListView) findViewById(R.id.messageListView);
+
+
+        List<MenuModel> menues = new ArrayList<>();
+        mMenuAdapter = new MenuAdapter(this, R.layout.item_menu, menues);
+        mMenuListView.setAdapter(mMenuAdapter);
 
         cameraPermission = new String[]{Manifest.permission.CAMERA,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE};
         storagePermission = new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE};
 
+        // Firebase Auth
         mFirebaseAuth = FirebaseAuth.getInstance();
         mAuthStateListener = new FirebaseAuth.AuthStateListener() {
             @Override
@@ -129,21 +149,79 @@ public class MainActivity extends AppCompatActivity {
             }
         };
 
+        // Firebase Database & Storage
+        mFirebaseDatabase = FirebaseDatabase.getInstance();
+        mFirebaseStorage = FirebaseStorage.getInstance();
+
+        mMenuesDatabaseReference = mFirebaseDatabase.getReference().child(
+                "menues");
+        mMenuPhotosStorageReference = mFirebaseStorage.getReference().child(
+                "menu_photos");
+
+        mSaveOcrBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+            }
+        });
+
     }
 
     private void onSignedInCleanup() {
         mUsername = ANONYMOUS;
-        //mMessageAdapter.clear();
+        mMenuAdapter.clear();
 
-        //detachDatabaseReadListener();
+        detachDatabaseReadListener();
 
+    }
+
+    private void detachDatabaseReadListener(){
+        if (mChildEventListener!=null){
+            mMenuesDatabaseReference.removeEventListener(mChildEventListener);
+            mChildEventListener = null;
+        }
     }
     private void onSignedInInitialize(String username) {
         mUsername = username;
 
-        //attachDatabaseReadListener();
+        attachDatabaseReadListener();
 
     }
+
+    private void attachDatabaseReadListener(){
+        if (mChildEventListener == null) {
+            mChildEventListener = new ChildEventListener() {
+                @Override
+                public void onChildAdded(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
+                    MenuModel friendlyMessage =
+                            snapshot.getValue(MenuModel.class);
+                    mMenuAdapter.add(friendlyMessage);
+                }
+
+                @Override
+                public void onChildChanged(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
+
+                }
+
+                @Override
+                public void onChildRemoved(@NonNull DataSnapshot snapshot) {
+
+                }
+
+                @Override
+                public void onChildMoved(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
+
+                }
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+
+                }
+            };
+
+            mMenuesDatabaseReference.addChildEventListener(mChildEventListener);
+        }
+    }
+
 
     @Override
     protected void onPause() {
@@ -152,7 +230,7 @@ public class MainActivity extends AppCompatActivity {
             mFirebaseAuth.removeAuthStateListener(mAuthStateListener);
         }
         //detachDatabaseReadListener();
-        //mMessageAdapter.clear();
+        mMenuAdapter.clear();
     };
 
     @Override
@@ -351,7 +429,7 @@ public class MainActivity extends AppCompatActivity {
         if (requestCode==CropImage.CROP_IMAGE_ACTIVITY_REQUEST_CODE){
             CropImage.ActivityResult result = CropImage.getActivityResult(data);
             if (resultCode == RESULT_OK){
-                Uri resultUri = result.getUri(); //get image uri
+                final Uri resultUri = result.getUri(); //get image uri
                 // set image to image view
                 mPreviewIv.setImageURI(resultUri);
 
@@ -452,6 +530,43 @@ public class MainActivity extends AppCompatActivity {
                     mResultEt.setText(sb.toString());
 
                 }*/
+                mSaveOcrBtn.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        final StorageReference photoRef =
+                                mMenuPhotosStorageReference.child(resultUri.getLastPathSegment());
+
+                        UploadTask uploadTask = photoRef.putFile(resultUri);
+                        Task<Uri> urlTask = uploadTask.continueWithTask(new Continuation<UploadTask.TaskSnapshot, Task<Uri>>() {
+                            @Override
+                            public Task<Uri> then(@NonNull Task<UploadTask.TaskSnapshot> task) throws Exception {
+                                if (!task.isSuccessful()) {
+                                    throw task.getException();
+                                }
+
+                                // Continue with the task to get the download URL
+                                return photoRef.getDownloadUrl();
+                            }
+                        }).addOnCompleteListener(new OnCompleteListener<Uri>() {
+                            @Override
+                            public void onComplete(@NonNull Task<Uri> task) {
+                                if (task.isSuccessful()) {
+                                    Uri downloadUri = task.getResult();
+                                    MenuModel menuItem =
+                                            new MenuModel(mResultEt.getText().toString(),
+                                                    downloadUri.toString(),
+                                                    mUsername);
+                                    mMenuesDatabaseReference.push().setValue(menuItem);
+
+                                } else {
+                                    // Handle failures
+                                    // ...
+                                }
+                            }
+                        });
+
+                    }
+                });
 
             }
             else if (resultCode == CropImage.CROP_IMAGE_ACTIVITY_RESULT_ERROR_CODE) {
