@@ -27,12 +27,15 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import com.firebase.ui.auth.AuthUI;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.vision.Frame;
 import com.google.android.gms.vision.text.TextBlock;
 import com.google.android.gms.vision.text.TextRecognizer;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.ml.common.modeldownload.FirebaseModelDownloadConditions;
 
 import com.google.firebase.ml.vision.FirebaseVision;
@@ -51,26 +54,37 @@ import com.google.mlkit.nl.translate.TranslatorOptions;
 import com.theartofdev.edmodo.cropper.CropImage;
 import com.theartofdev.edmodo.cropper.CropImageView;
 
+import java.util.Arrays;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
     EditText mResultEt;
-    EditText mResultEtTranslate;
+    //EditText mResultEtTranslate;
     ImageView mPreviewIv;
 
     private static final String TAG = "MainActivity";
 
+    public static final int RC_SIGN_IN = 1;
 
     private static final int CAMERA_REQUEST_CODE = 200;
     private static final int STORAGE_REQUEST_CODE = 400;
     private static final int IMAGE_PICK_GALLERY_CODE = 1000;
     private static final int IMAGE_PICK_CAMERA_CODE = 1001;
+    public static final String ANONYMOUS = "anonymous";
+
 
     String cameraPermission[];
     String storagePermission[];
 
+    private String mUsername;
+
+
     Uri image_uri;
+
+    private FirebaseAuth mFirebaseAuth;
+    private FirebaseAuth.AuthStateListener mAuthStateListener;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -79,14 +93,74 @@ public class MainActivity extends AppCompatActivity {
         ActionBar actionBar = getSupportActionBar();
 
         mResultEt = findViewById(R.id.resultEt);
-        mResultEtTranslate = findViewById(R.id.resultEtTranslate);
+        //mResultEtTranslate = findViewById(R.id.resultEtTranslate);
         mPreviewIv = findViewById(R.id.imageIv);
 
         cameraPermission = new String[]{Manifest.permission.CAMERA,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE};
         storagePermission = new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE};
+
+        mFirebaseAuth = FirebaseAuth.getInstance();
+        mAuthStateListener = new FirebaseAuth.AuthStateListener() {
+            @Override
+            public void onAuthStateChanged(@NonNull FirebaseAuth firebaseAuth) {
+                FirebaseUser user = firebaseAuth.getCurrentUser();
+                if (user!=null){
+                    //user is signed in
+                    onSignedInInitialize(user.getDisplayName());
+                }
+                else {
+                    //user is signed out
+                    onSignedInCleanup();
+                    List<AuthUI.IdpConfig> providers = Arrays.asList(
+                            new AuthUI.IdpConfig.EmailBuilder().build(),
+                            new AuthUI.IdpConfig.GoogleBuilder().build());
+
+                    // Create and launch sign-in intent
+                    startActivityForResult(
+                            AuthUI.getInstance()
+                                    .createSignInIntentBuilder()
+                                    .setIsSmartLockEnabled(false)
+                                    .setAvailableProviders(providers)
+                                    .build(),
+                            RC_SIGN_IN);
+                }
+
+            }
+        };
+
     }
 
+    private void onSignedInCleanup() {
+        mUsername = ANONYMOUS;
+        //mMessageAdapter.clear();
+
+        //detachDatabaseReadListener();
+
+    }
+    private void onSignedInInitialize(String username) {
+        mUsername = username;
+
+        //attachDatabaseReadListener();
+
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (mAuthStateListener != null){
+            mFirebaseAuth.removeAuthStateListener(mAuthStateListener);
+        }
+        //detachDatabaseReadListener();
+        //mMessageAdapter.clear();
+    };
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        mFirebaseAuth.addAuthStateListener(mAuthStateListener);
+
+    };
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         //inflate menu
@@ -101,9 +175,9 @@ public class MainActivity extends AppCompatActivity {
         if (id == R.id.addImage) {
             showImageImportDialog();
         }
-        if (id == R.id.settings) {
-            Toast.makeText(this, "Settings", Toast.LENGTH_SHORT).show();
-        }
+        if (id == R.id.sign_out_menu) {
+            AuthUI.getInstance().signOut(MainActivity.this);
+            return true;        }
         return super.onOptionsItemSelected(item);
     }
 
@@ -264,6 +338,7 @@ public class MainActivity extends AppCompatActivity {
         if (resultCode == RESULT_OK){
             if (requestCode == IMAGE_PICK_GALLERY_CODE){
                 //got image from gallery -> crop
+
                 CropImage.activity(data.getData()).setGuidelines(CropImageView.Guidelines.ON).start(this); //enable guidlines
             }
             if (requestCode == IMAGE_PICK_CAMERA_CODE){
@@ -298,6 +373,7 @@ public class MainActivity extends AppCompatActivity {
                                 final String originalText = result.getText();
                                 mResultEt.setText(originalText);
 
+                                /* TODO add translator back
                                 TranslatorOptions options =
                                         new TranslatorOptions.Builder()
                                                 .setSourceLanguage(TranslateLanguage.SPANISH)
@@ -341,7 +417,7 @@ public class MainActivity extends AppCompatActivity {
                                                         // Model couldn’t be downloaded or other internal error.
                                                         e.printStackTrace();
                                                     }
-                                                });
+                                                });*/
 
 
                             }
